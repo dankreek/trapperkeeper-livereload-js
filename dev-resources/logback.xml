@@ -1,0 +1,15 @@
+<configuration scan="true">
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d %-5p [%t] [%c{2}] %m%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="org.eclipse.jetty.server" level="warn"/>
+    <logger name="org.eclipse.jetty.util.log" level="warn"/>
+    <logger name="trapperkeeper-live-reload" level="trace"/>
+
+    <root level="info">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>
