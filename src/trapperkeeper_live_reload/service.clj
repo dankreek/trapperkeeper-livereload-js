@@ -6,5 +6,6 @@
   [[:ConfigService get-in-config]
    [:WebroutingService add-websocket-handler]]
   (init [this context]
-        (add-websocket-handler this (core/get-ws-handler))
-        context))
+        (let [ws-store (core/create-ws-store!)]
+          (add-websocket-handler this (core/get-ws-handler ws-store))
+          (assoc context :ws-store ws-store))))
