@@ -9,6 +9,8 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [puppetlabs/trapperkeeper ~tk-version]
                  [puppetlabs/trapperkeeper-webserver-jetty9 "1.5.7"]
+                 [cheshire "5.6.3"]
+                 [slingshot "0.12.2"]
 
                  ;; Transitive deps
                  [clj-time "0.7.0"]]
