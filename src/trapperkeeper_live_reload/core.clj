@@ -1,19 +1,41 @@
 (ns trapperkeeper-live-reload.core
   (:require [clojure.tools.logging :as log]
             [cheshire.core :as json]
-            [slingshot.slingshot :refer [throw+ try+]])
+            [slingshot.slingshot :refer [throw+ try+]]
+            [puppetlabs.experimental.websockets.client :refer [send!] :as ws-client])
   (:import (com.fasterxml.jackson.core JsonParseException)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Definitions
 
+(def handshake-commands
+  "Commands supported by all protocol versions and both client and server."
+  {:hello {"protocols" [:required :array]
+           "id" [:string]
+           "name" [:string]
+           "version" [:string]}})
+
 (def protocols
+  "All supported protocols, their descriptors and supported commands."
   {:conn-check-1 {:version 1
                   :url "http://livereload.com/protocols/connection-check-1"
-                  :client-commands {:ping {:token ["required" "string"]}
-                                    :pong {:token ["required" "string"]}}
-                  :server-commands {:ping {:token ["required" "string"]}
-                                    :pong {:token ["required" "string"]}}}})
+                  :client-commands {"ping" {"token" [:required :string]}
+                                    "pong" {"token" [:required :string]}}
+                  :server-commands {"ping" {"token" [:required :string]}
+                                    "pong" {"token" [:required :string]}}}
+
+   :monitoring-7 {:version 7
+                  :url "http://livereload.com/protocols/official-7"
+                  :client-commands {"info" {"url" []
+                                            "plugins" []}}
+                  :server-commands {"reload" {"path" [:required :string]
+                                              "liveCSS" [:boolean]
+                                              "originalPath" [:string]
+                                              "overrideURL" [:string]}}}})
+
+(def supported-protocols
+  "The set of livereload protocols supported by this server"
+  (set (for [[_ p] protocols] (get p :url))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Private
@@ -25,6 +47,18 @@
     (if-not protocol-key
       (throw+ {:type ::unknown-protocol :url url}))
       protocol-key))
+
+(defn handle-hello-
+  [client-store ws payload]
+  ;; calculate negotiated protocols, store them in the client-store and respond with the right command
+  {:command "hello"
+   :protocols supported-protocols})
+
+(defn handle-ping-
+  [client-store ws payload]
+  ;; TODO: Validate all parts of this message with the protocol definitions above
+  {:command "pong"
+   :token (:token payload)})
 
 (defn store-ws!-
   "Store a websocket connection into the provided store."
@@ -72,9 +106,14 @@
 
 (defn on-text!-
   [client-store ws message]
-  (let [client (get-client- client-store ws)
-        payload (decode-playload- message)]
-    (log/info "on-text!" payload)))
+  (let [payload (decode-playload- message)
+        response (json/encode
+                   (case (:command payload)
+                     "hello" (handle-hello- client-store ws payload)
+                     "ping" (handle-ping- client-store ws payload)))]
+    (log/debug "Got message" payload)
+    (log/debug "Sending response" response)
+    (send! ws response)))
 
 (defn on-bytes!-
   [ws-store ws bytes offset len]
